@@ -123,11 +123,12 @@
   <div class="app">
     <div class="header">
       <div>
-        <h1 class="title">飞书文档分段汇报计时器 V2</h1>
-        <p class="subtitle">解决飞书文档滚动后看不到计时器的问题：支持独立计时窗口、系统提醒、标签页倒计时。</p>
+        <h1 class="title">飞书文档分段汇报计时器 V3</h1>
+        <p class="subtitle">解决飞书文档滚动和窗口遮挡问题：支持置顶小窗/PiP、系统提醒、标签页倒计时。</p>
       </div>
       <div class="tabs">
         <button id="fullscreenBtn">大屏模式</button>
+        <button id="pipBtn">置顶小窗/PiP</button>
         <button id="popupBtn">独立计时窗口</button>
         <button id="notifyBtn">开启系统提醒</button>
         <button id="exportBtn">导出配置</button>
@@ -184,10 +185,10 @@
         </div>
         <div class="hint">
           <strong>飞书文档推荐用法：</strong><br />
-          1. 先在飞书文档顶部打开计时器。<br />
-          2. 点击“独立计时窗口”，把小窗口放到屏幕右侧。<br />
+          1. 先在 Chrome 或 Edge 打开计时器网页。<br />
+          2. 点击“置顶小窗/PiP”，小窗会浮在飞书文档上方。<br />
           3. 点击“开启系统提醒”，允许浏览器通知。<br />
-          4. 之后滚动飞书文档也能收到到点提醒。
+          4. 之后滚动或点击飞书文档，也能看到倒计时。
         </div>
       </div>
     </div>
@@ -214,6 +215,7 @@
     };
     let intervalId = null;
     let autoAdvanceTimeoutId = null;
+    let pipWindow = null;
     const $ = (id) => document.getElementById(id);
 
     function secondsForSection(index) {
@@ -272,6 +274,149 @@
       if (!canNotify() || Notification.permission !== "granted") return;
       try { new Notification(title, { body, silent: false }); } catch (e) {}
     }
+
+    async function openPipWindow() {
+      if (!("documentPictureInPicture" in window)) {
+        alert("当前浏览器不支持置顶小窗。建议使用最新版 Chrome 或 Edge；或者使用 Windows PowerToys 的 Always On Top。");
+        return;
+      }
+
+      try {
+        pipWindow = await documentPictureInPicture.requestWindow({
+          width: 380,
+          height: 240
+        });
+
+        pipWindow.document.body.innerHTML = `
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              height: 100vh;
+              background: #111827;
+              color: white;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              overflow: hidden;
+            }
+            .pip-wrap {
+              width: 100%;
+              height: 100%;
+              padding: 18px;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              text-align: center;
+            }
+            .pip-status {
+              font-size: 13px;
+              opacity: .72;
+              margin-bottom: 8px;
+            }
+            .pip-title {
+              font-size: 20px;
+              font-weight: 700;
+              line-height: 1.25;
+              max-width: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+              margin-bottom: 12px;
+            }
+            .pip-time {
+              font-size: 76px;
+              line-height: 1;
+              font-weight: 800;
+              font-variant-numeric: tabular-nums;
+              letter-spacing: -3px;
+            }
+            .pip-time.warning { color: #f5a623; }
+            .pip-time.urgent { color: #ff7a1a; }
+            .pip-time.overtime { color: #ff4d4f; }
+            .pip-message {
+              margin-top: 10px;
+              font-size: 14px;
+              opacity: .85;
+              max-width: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+            .pip-next {
+              margin-top: 8px;
+              font-size: 12px;
+              opacity: .62;
+              max-width: 100%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          </style>
+          <div class="pip-wrap">
+            <div id="pipStatus" class="pip-status"></div>
+            <div id="pipTitle" class="pip-title"></div>
+            <div id="pipTime" class="pip-time"></div>
+            <div id="pipMessage" class="pip-message"></div>
+            <div id="pipNext" class="pip-next"></div>
+          </div>
+        `;
+
+        pipWindow.addEventListener("pagehide", () => {
+          pipWindow = null;
+        });
+
+        renderPip();
+      } catch (e) {
+        console.warn("PiP 打开失败", e);
+      }
+    }
+
+    function renderPip() {
+      if (!pipWindow || pipWindow.closed) return;
+      const doc = pipWindow.document;
+      const current = state.sections[state.currentIndex];
+      const next = state.sections[state.currentIndex + 1];
+      const timeText = state.remaining < 0 ? formatTime(state.remaining, true) : formatTime(state.remaining);
+
+      const pipStatus = doc.getElementById("pipStatus");
+      const pipTitle = doc.getElementById("pipTitle");
+      const pipTime = doc.getElementById("pipTime");
+      const pipMessage = doc.getElementById("pipMessage");
+      const pipNext = doc.getElementById("pipNext");
+
+      if (!pipStatus || !pipTitle || !pipTime) return;
+
+      pipStatus.textContent = `${state.status === "running" ? "计时中" : state.status === "paused" ? "已暂停" : state.status === "finished" ? "已结束" : "未开始"}｜第 ${state.currentIndex + 1}/${state.sections.length} 部分`;
+      pipTitle.textContent = current ? current.title : "分段汇报";
+      pipTime.textContent = timeText;
+      pipTime.className = "pip-time";
+
+      if (state.remaining < 0) {
+        pipTime.classList.add("overtime");
+        pipMessage.textContent = `已超时 ${formatTime(Math.abs(state.remaining))}`;
+      } else if (state.remaining <= 30 && state.status === "running") {
+        pipTime.classList.add("urgent");
+        pipMessage.textContent = "剩余30秒，请尽快总结";
+      } else if (state.remaining <= 60 && state.status === "running") {
+        pipTime.classList.add("warning");
+        pipMessage.textContent = "剩余1分钟，请准备收尾";
+      } else if (state.status === "running") {
+        pipMessage.textContent = "正在计时";
+      } else if (state.status === "paused") {
+        pipMessage.textContent = "已暂停";
+      } else if (state.status === "finished") {
+        pipMessage.textContent = "汇报已结束";
+      } else {
+        pipMessage.textContent = "等待开始";
+      }
+
+      pipNext.textContent = next ? `下一部分：${next.title}` : "下一部分：无";
+    }
+
     function openTimerPopup() {
       const url = window.location.href;
       const w = 520, h = 680;
@@ -377,6 +522,7 @@
 
       $("autoAdvance").checked = state.autoAdvance;
       $("beepEnabled").checked = state.beepEnabled;
+      renderPip();
     }
 
     function render() { renderSections(); renderTimer(); }
@@ -521,6 +667,7 @@
         document.body.classList.toggle("fullscreen");
         $("fullscreenBtn").textContent = document.body.classList.contains("fullscreen") ? "退出大屏" : "大屏模式";
       });
+      $("pipBtn").addEventListener("click", openPipWindow);
       $("popupBtn").addEventListener("click", openTimerPopup);
       $("notifyBtn").addEventListener("click", requestNotifyPermission);
       $("exportBtn").addEventListener("click", exportConfig);
