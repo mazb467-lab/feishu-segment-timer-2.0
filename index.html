@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>飞书文档分段汇报计时器</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --card: #ffffff;
+      --text: #1f2329;
+      --muted: #646a73;
+      --line: #dee0e3;
+      --primary: #1456f0;
+      --primary-dark: #0f47c7;
+      --green: #22a06b;
+      --yellow: #f5a623;
+      --orange: #ff7a1a;
+      --red: #d83931;
+      --shadow: 0 10px 30px rgba(31, 35, 41, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    }
+
+    .app {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.3;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.16s ease;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+
+    button.primary:hover {
+      background: var(--primary-dark);
+      color: #fff;
+    }
+
+    button.danger {
+      color: var(--red);
+      border-color: rgba(216,57,49,.35);
+    }
+
+    button.danger:hover {
+      color: #fff;
+      background: var(--red);
+      border-color: var(--red);
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .timer-card {
+      min-height: 500px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .status-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      background: #f2f3f5;
+      color: var(--muted);
+    }
+
+    .pill.running { background: rgba(20, 86, 240, .12); color: var(--primary); }
+    .pill.paused { background: rgba(245, 166, 35, .16); color: #a35f00; }
+    .pill.finished { background: rgba(34, 160, 107, .14); color: var(--green); }
+    .pill.warning { background: rgba(245, 166, 35, .18); color: #a35f00; }
+    .pill.danger { background: rgba(216,57,49,.14); color: var(--red); }
+
+    .chapter {
+      text-align: center;
+      padding: 36px 12px 20px;
+    }
+
+    .chapter-index {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    .chapter-title {
+      font-size: 30px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      word-break: break-word;
+    }
+
+    .timer {
+      font-variant-numeric: tabular-nums;
+      font-size: clamp(68px, 13vw, 140px);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -4px;
+      margin: 18px 0;
+    }
+
+    .timer.warning {
+      color: var(--yellow);
+    }
+
+    .timer.urgent {
+      color: var(--orange);
+    }
+
+    .timer.overtime {
+      color: var(--red);
+    }
+
+    .message {
+      min-height: 28px;
+      color: var(--muted);
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .message.warning { color: #a35f00; }
+    .message.urgent { color: var(--orange); }
+    .message.overtime { color: var(--red); }
+
+    .next-box {
+      background: #f7f8fa;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .progress {
+      height: 9px;
+      width: 100%;
+      background: #edf0f5;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 18px;
+    }
+
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      border-radius: 999px;
+      transition: width .2s linear;
+    }
+
+    .bar.warning { background: var(--yellow); }
+    .bar.urgent { background: var(--orange); }
+    .bar.overtime { background: var(--red); }
+
+    .section-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 540px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .section-item {
+      display: grid;
+      grid-template-columns: 1fr 78px 34px;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+
+    .section-item.active {
+      border-color: rgba(20, 86, 240, .55);
+      background: rgba(20, 86, 240, .04);
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(20, 86, 240, .1);
+    }
+
+    .mini-btn {
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border-radius: 8px;
+      color: var(--red);
+    }
+
+    .config-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+      margin-top: 12px;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+    }
+
+    .fullscreen .app {
+      max-width: none;
+      height: 100vh;
+      padding: 16px;
+    }
+
+    .fullscreen .header,
+    .fullscreen .config-card {
+      display: none;
+    }
+
+    .fullscreen .grid {
+      display: block;
+      height: 100%;
+    }
+
+    .fullscreen .timer-card {
+      height: calc(100vh - 32px);
+      border-radius: 22px;
+    }
+
+    .fullscreen .chapter-title {
+      font-size: 48px;
+    }
+
+    .fullscreen .timer {
+      font-size: clamp(120px, 24vw, 280px);
+    }
+
+    @media (max-width: 860px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+      }
+
+      .timer-card {
+        min-height: auto;
+      }
+
+      .section-item {
+        grid-template-columns: 1fr 70px 34px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div>
+        <h1 class="title">飞书文档分段汇报计时器</h1>
+        <p class="subtitle">适合经营会、复盘会、开题答辩、项目汇报。支持章节倒计时、到点提醒、自动进入下一章。</p>
+      </div>
+      <div class="tabs">
+        <button id="fullscreenBtn">大屏模式</button>
+        <button id="exportBtn">导出配置</button>
+        <button id="importBtn">导入配置</button>
+        <input id="importFile" type="file" accept=".json" style="display:none" />
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card timer-card">
+        <div>
+          <div class="status-line">
+            <span id="statusPill" class="pill">未开始</span>
+            <span id="totalInfo">总时长：00:00</span>
+          </div>
+
+          <div class="chapter">
+            <div id="chapterIndex" class="chapter-index">第 1 / 1 部分</div>
+            <div id="chapterTitle" class="chapter-title">请先配置汇报章节</div>
+            <div id="timer" class="timer">00:00</div>
+            <div id="message" class="message">点击“开始”后开始分段倒计时</div>
+            <div class="progress">
+              <div id="bar" class="bar"></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="next-box">
+            <div>
+              <strong>下一部分：</strong>
+              <span id="nextTitle">无</span>
+            </div>
+            <div>
+              <strong>模式：</strong>
+              <span id="autoModeLabel">自动进入下一章</span>
+            </div>
+          </div>
+
+          <div class="controls">
+            <button id="startPauseBtn" class="primary">开始</button>
+            <button id="prevBtn">上一章</button>
+            <button id="nextBtn">下一章</button>
+            <button id="resetBtn">重置</button>
+            <button id="endBtn" class="danger">结束汇报</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card config-card">
+        <h2 style="margin:0 0 12px;font-size:18px;">章节配置</h2>
+        <div class="section-list" id="sectionList"></div>
+
+        <div class="config-actions">
+          <button id="addBtn">添加章节</button>
+          <button id="saveBtn" class="primary">保存配置</button>
+          <button id="templateBtn">套用20分钟模板</button>
+        </div>
+
+        <div style="margin-top:14px;display:flex;gap:8px;align-items:center;">
+          <input id="autoAdvance" type="checkbox" checked style="width:auto;" />
+          <label for="autoAdvance" style="font-size:14px;color:var(--muted);">到点后自动进入下一章</label>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+          <input id="beepEnabled" type="checkbox" checked style="width:auto;" />
+          <label for="beepEnabled" style="font-size:14px;color:var(--muted);">到点播放提示音</label>
+        </div>
+
+        <div class="hint">
+          <strong>使用建议：</strong><br />
+          1. 在飞书文档中把这个页面作为网页小组件/嵌入页面使用。<br />
+          2. 第一版配置会保存到浏览器 localStorage，刷新不丢失。<br />
+          3. 如果要多人同步，需要加后端保存 currentIndex、status、startTime 等状态。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_SECTIONS = [
+      { title: "开场说明", minutes: 1 },
+      { title: "研究背景", minutes: 3 },
+      { title: "数据分析", minutes: 5 },
+      { title: "问题诊断", minutes: 4 },
+      { title: "运营策略", minutes: 5 },
+      { title: "总结与行动项", minutes: 2 }
+    ];
+
+    const STORAGE_KEY = "feishu_segment_timer_v1";
+
+    let state = {
+      sections: [...DEFAULT_SECTIONS],
+      currentIndex: 0,
+      remaining: DEFAULT_SECTIONS[0].minutes * 60,
+      status: "idle", // idle | running | paused | finished
+      overtime: 0,
+      autoAdvance: true,
+      beepEnabled: true
+    };
+
+    let intervalId = null;
+    let autoAdvanceTimeoutId = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function secondsForSection(index) {
+      const section = state.sections[index];
+      if (!section) return 0;
+      return Math.max(1, Number(section.minutes || 0)) * 60;
+    }
+
+    function formatTime(seconds, withSign = false) {
+      const abs = Math.abs(seconds);
+      const m = Math.floor(abs / 60);
+      const s = abs % 60;
+      const prefix = withSign && seconds < 0 ? "-" : "";
+      return `${prefix}${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    function totalSeconds() {
+      return state.sections.reduce((sum, s) => sum + Math.max(1, Number(s.minutes || 0)) * 60, 0);
+    }
+
+    function saveToLocal() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        sections: state.sections,
+        autoAdvance: state.autoAdvance,
+        beepEnabled: state.beepEnabled
+      }));
+    }
+
+    function loadFromLocal() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data.sections) && data.sections.length) {
+          state.sections = data.sections.map(s => ({
+            title: String(s.title || "未命名章节"),
+            minutes: Math.max(1, Number(s.minutes || 1))
+          }));
+          state.currentIndex = 0;
+          state.remaining = secondsForSection(0);
+        }
+        state.autoAdvance = data.autoAdvance !== false;
+        state.beepEnabled = data.beepEnabled !== false;
+      } catch (e) {
+        console.warn("配置读取失败", e);
+      }
+    }
+
+    function renderSections() {
+      const list = $("sectionList");
+      list.innerHTML = "";
+
+      state.sections.forEach((section, index) => {
+        const item = document.createElement("div");
+        item.className = "section-item" + (index === state.currentIndex ? " active" : "");
+
+        const titleInput = document.createElement("input");
+        titleInput.value = section.title;
+        titleInput.placeholder = "章节名称";
+        titleInput.addEventListener("input", () => {
+          state.sections[index].title = titleInput.value;
+          renderTimer();
+          saveToLocal();
+        });
+
+        const minutesInput = document.createElement("input");
+        minutesInput.type = "number";
+        minutesInput.min = "1";
+        minutesInput.step = "1";
+        minutesInput.value = section.minutes;
+        minutesInput.title = "分钟";
+        minutesInput.addEventListener("input", () => {
+          state.sections[index].minutes = Math.max(1, Number(minutesInput.value || 1));
+          if (index === state.currentIndex && state.status === "idle") {
+            state.remaining = secondsForSection(index);
+          }
+          renderTimer();
+          saveToLocal();
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "mini-btn";
+        removeBtn.textContent = "×";
+        removeBtn.title = "删除章节";
+        removeBtn.addEventListener("click", () => {
+          if (state.sections.length <= 1) {
+            alert("至少保留一个章节");
+            return;
+          }
+          state.sections.splice(index, 1);
+          state.currentIndex = Math.min(state.currentIndex, state.sections.length - 1);
+          if (state.status !== "running") {
+            state.remaining = secondsForSection(state.currentIndex);
+          }
+          render();
+          saveToLocal();
+        });
+
+        item.appendChild(titleInput);
+        item.appendChild(minutesInput);
+        item.appendChild(removeBtn);
+        list.appendChild(item);
+      });
+    }
+
+    function renderTimer() {
+      const current = state.sections[state.currentIndex];
+      const next = state.sections[state.currentIndex + 1];
+
+      $("chapterIndex").textContent = `第 ${state.currentIndex + 1} / ${state.sections.length} 部分`;
+      $("chapterTitle").textContent = current ? current.title : "请先配置汇报章节";
+      $("nextTitle").textContent = next ? `${next.title}（${next.minutes}分钟）` : "无";
+      $("autoModeLabel").textContent = state.autoAdvance ? "自动进入下一章" : "手动进入下一章";
+      $("totalInfo").textContent = `总时长：${formatTime(totalSeconds())}`;
+
+      const timer = $("timer");
+      const msg = $("message");
+      const bar = $("bar");
+      const pill = $("statusPill");
+
+      timer.className = "timer";
+      msg.className = "message";
+      bar.className = "bar";
+      pill.className = "pill";
+
+      const duration = secondsForSection(state.currentIndex);
+      const elapsed = Math.max(0, duration - Math.max(state.remaining, 0));
+      const percent = duration > 0 ? Math.min(100, (elapsed / duration) * 100) : 0;
+      bar.style.width = `${percent}%`;
+
+      if (state.remaining < 0) {
+        timer.textContent = formatTime(state.remaining, true);
+        timer.classList.add("overtime");
+        msg.classList.add("overtime");
+        bar.classList.add("overtime");
+        msg.textContent = `已超时 ${formatTime(Math.abs(state.remaining))}，请尽快结束本部分`;
+      } else {
+        timer.textContent = formatTime(state.remaining);
+        if (state.status === "finished") {
+          msg.textContent = "汇报已结束";
+        } else if (state.remaining <= 30 && state.status === "running") {
+          timer.classList.add("urgent");
+          msg.classList.add("urgent");
+          bar.classList.add("urgent");
+          msg.textContent = "剩余30秒，请尽快总结";
+        } else if (state.remaining <= 60 && state.status === "running") {
+          timer.classList.add("warning");
+          msg.classList.add("warning");
+          bar.classList.add("warning");
+          msg.textContent = "剩余1分钟，请准备收尾";
+        } else if (state.status === "running") {
+          msg.textContent = "正在计时";
+        } else if (state.status === "paused") {
+          msg.textContent = "已暂停";
+        } else {
+          msg.textContent = "点击“开始”后开始分段倒计时";
+        }
+      }
+
+      if (state.status === "running") {
+        pill.textContent = "计时中";
+        pill.classList.add("running");
+        $("startPauseBtn").textContent = "暂停";
+      } else if (state.status === "paused") {
+        pill.textContent = "已暂停";
+        pill.classList.add("paused");
+        $("startPauseBtn").textContent = "继续";
+      } else if (state.status === "finished") {
+        pill.textContent = "已结束";
+        pill.classList.add("finished");
+        $("startPauseBtn").textContent = "重新开始";
+      } else {
+        pill.textContent = "未开始";
+        $("startPauseBtn").textContent = "开始";
+      }
+
+      $("autoAdvance").checked = state.autoAdvance;
+      $("beepEnabled").checked = state.beepEnabled;
+    }
+
+    function render() {
+      renderSections();
+      renderTimer();
+    }
+
+    function beep(type = "normal") {
+      if (!state.beepEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = type === "end" ? 880 : 660;
+        gain.gain.value = 0.08;
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+
+        setTimeout(() => {
+          osc.stop();
+          ctx.close();
+        }, type === "end" ? 350 : 180);
+      } catch (e) {
+        console.warn("提示音播放失败", e);
+      }
+    }
+
+    function startTimer() {
+      if (!state.sections.length) return;
+
+      if (state.status === "finished") {
+        resetTimer();
+      }
+
+      state.status = "running";
+      clearInterval(intervalId);
+      intervalId = setInterval(tick, 1000);
+      renderTimer();
+    }
+
+    function pauseTimer() {
+      state.status = "paused";
+      clearInterval(intervalId);
+      clearTimeout(autoAdvanceTimeoutId);
+      renderTimer();
+    }
+
+    function tick() {
+      state.remaining -= 1;
+
+      if (state.remaining === 60 || state.remaining === 30) {
+        beep("normal");
+      }
+
+      if (state.remaining === 0) {
+        beep("end");
+
+        if (state.autoAdvance) {
+          clearTimeout(autoAdvanceTimeoutId);
+          autoAdvanceTimeoutId = setTimeout(() => {
+            goNext();
+          }, 5000);
+        }
+      }
+
+      if (state.remaining < 0 && state.autoAdvance) {
+        // 自动模式下等待5秒提示后切换，避免立即跳转导致汇报人错过提醒
+      }
+
+      renderTimer();
+    }
+
+    function goNext() {
+      clearTimeout(autoAdvanceTimeoutId);
+
+      if (state.currentIndex < state.sections.length - 1) {
+        state.currentIndex += 1;
+        state.remaining = secondsForSection(state.currentIndex);
+        if (state.status !== "running") {
+          state.status = "idle";
+        }
+        render();
+      } else {
+        finishTimer();
+      }
+    }
+
+    function goPrev() {
+      clearTimeout(autoAdvanceTimeoutId);
+      if (state.currentIndex > 0) {
+        state.currentIndex -= 1;
+        state.remaining = secondsForSection(state.currentIndex);
+        if (state.status !== "running") {
+          state.status = "idle";
+        }
+        render();
+      }
+    }
+
+    function resetTimer() {
+      clearInterval(intervalId);
+      clearTimeout(autoAdvanceTimeoutId);
+      state.currentIndex = 0;
+      state.remaining = secondsForSection(0);
+      state.status = "idle";
+      render();
+    }
+
+    function finishTimer() {
+      clearInterval(intervalId);
+      clearTimeout(autoAdvanceTimeoutId);
+      state.status = "finished";
+      state.remaining = 0;
+      renderTimer();
+    }
+
+    function addSection() {
+      state.sections.push({ title: `新章节 ${state.sections.length + 1}`, minutes: 3 });
+      render();
+      saveToLocal();
+    }
+
+    function applyTemplate() {
+      if (!confirm("确认套用20分钟模板？当前章节配置会被覆盖。")) return;
+      state.sections = [...DEFAULT_SECTIONS];
+      resetTimer();
+      saveToLocal();
+    }
+
+    function exportConfig() {
+      const data = {
+        name: "飞书文档分段汇报计时器配置",
+        version: "1.0",
+        sections: state.sections,
+        autoAdvance: state.autoAdvance,
+        beepEnabled: state.beepEnabled
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "segment-timer-config.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importConfig(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!Array.isArray(data.sections) || !data.sections.length) {
+            alert("配置文件格式不正确");
+            return;
+          }
+          state.sections = data.sections.map(s => ({
+            title: String(s.title || "未命名章节"),
+            minutes: Math.max(1, Number(s.minutes || 1))
+          }));
+          state.autoAdvance = data.autoAdvance !== false;
+          state.beepEnabled = data.beepEnabled !== false;
+          resetTimer();
+          saveToLocal();
+        } catch (e) {
+          alert("配置读取失败");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function bindEvents() {
+      $("startPauseBtn").addEventListener("click", () => {
+        if (state.status === "running") {
+          pauseTimer();
+        } else {
+          startTimer();
+        }
+      });
+
+      $("prevBtn").addEventListener("click", goPrev);
+      $("nextBtn").addEventListener("click", goNext);
+      $("resetBtn").addEventListener("click", resetTimer);
+      $("endBtn").addEventListener("click", finishTimer);
+      $("addBtn").addEventListener("click", addSection);
+      $("saveBtn").addEventListener("click", () => {
+        saveToLocal();
+        alert("配置已保存");
+      });
+      $("templateBtn").addEventListener("click", applyTemplate);
+
+      $("autoAdvance").addEventListener("change", (e) => {
+        state.autoAdvance = e.target.checked;
+        saveToLocal();
+        renderTimer();
+      });
+
+      $("beepEnabled").addEventListener("change", (e) => {
+        state.beepEnabled = e.target.checked;
+        saveToLocal();
+        renderTimer();
+      });
+
+      $("fullscreenBtn").addEventListener("click", () => {
+        document.body.classList.toggle("fullscreen");
+        $("fullscreenBtn").textContent = document.body.classList.contains("fullscreen") ? "退出大屏" : "大屏模式";
+      });
+
+      $("exportBtn").addEventListener("click", exportConfig);
+      $("importBtn").addEventListener("click", () => $("importFile").click());
+      $("importFile").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) importConfig(file);
+        e.target.value = "";
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.target.tagName === "INPUT") return;
+        if (e.code === "Space") {
+          e.preventDefault();
+          state.status === "running" ? pauseTimer() : startTimer();
+        }
+        if (e.key === "ArrowRight") goNext();
+        if (e.key === "ArrowLeft") goPrev();
+        if (e.key.toLowerCase() === "r") resetTimer();
+      });
+    }
+
+    function init() {
+      loadFromLocal();
+      bindEvents();
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
